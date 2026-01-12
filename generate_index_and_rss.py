@@ -138,8 +138,8 @@ RSS_TEMPLATE = """<?xml version="1.0" encoding="utf-8"?>
 <rss version="2.0">
     <channel>
         <title>誤字ロマの道具箱</title>
-        <link>https://example.com/</link>
-        <description>誤字ロマの道具箱 - HTMLファイル一覧</description>
+        <link>https://tools.poet.blue/</link>
+        <description>生活を楽しくする小物たちを公開</description>
         <lastBuildDate>{}</lastBuildDate>
         {}
     </channel>
