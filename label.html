@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ラベルシート（全角文字数対応）</title>
+    <style>
+        @page {
+            size: A5 portrait;
+            margin: 0;
+        }
+
+        body {
+            font-family: 'メイリオ', 'Hiragino Sans', sans-serif;
+            margin: 0;
+            padding: 2mm;
+            width: 148mm;
+            min-height: 210mm;
+            background-color: white;
+            box-sizing: border-box;
+        }
+
+        .label-sheet {
+            width: 100%;
+            margin-bottom: 5mm;
+        }
+
+        .label-row {
+            display: flex;
+            width: 100%;
+            margin-bottom: 0.5mm;
+        }
+
+        .label {
+            height: 12pt;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 10pt;
+            font-weight: bold;
+            box-sizing: border-box;
+            border: 0.1mm solid #ccc;
+            margin-right: 0.5mm;
+            margin-bottom: 0.5mm;
+            padding: 0 1mm;
+            text-align: center;
+            word-break: break-all;
+            cursor: pointer;
+            white-space: nowrap;
+            flex-grow: 1;
+            flex-shrink: 0;
+        }
+
+        .input-row {
+            margin-bottom: 3mm;
+            width: 100%;
+        }
+
+        #word-input {
+            width: 100%;
+            height: 12pt;
+            font-size: 10pt;
+            font-weight: bold;
+            box-sizing: border-box;
+            border: 0.1mm solid #ccc;
+            margin-bottom: 0.5mm;
+            padding: 0 1mm;
+            text-align: center;
+        }
+
+        @media print {
+            body {
+                margin: 0;
+                padding: 0;
+            }
+
+            .label {
+                border: none;
+                margin: 0;
+            }
+
+            .input-row {
+                display: none;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="label-sheet" id="label-sheet"></div>
+    <div class="input-row">
+        <input type="text" id="word-input" placeholder="ワードを入力してEnter">
+    </div>
+
+    <script>
+        const colors = ['#7FFFD4', '#FF69B4', '#FF4500', '#FFA500', '#FF1493', '#4169E1', '#32CD32', '#1E90FF', '#98FB98', '#FFD700', '#9ACD32', '#87CEFA'];
+        const sheet = document.getElementById('label-sheet');
+        const wordInput = document.getElementById('word-input');
+
+        // LocalStorageからデータを読み込む
+        function loadFromLocalStorage() {
+            const savedData = localStorage.getItem('labelSheetData');
+            if (savedData) {
+                const data = JSON.parse(savedData);
+                data.forEach(item => {
+                    addLabelRow(item.word, item.color, item.textColor);
+                });
+            }
+        }
+
+        // LocalStorageにデータを保存する
+        function saveToLocalStorage(word, color, textColor) {
+            const savedData = localStorage.getItem('labelSheetData') || '[]';
+            const data = JSON.parse(savedData);
+            data.push({ word, color, textColor });
+            localStorage.setItem('labelSheetData', JSON.stringify(data));
+        }
+
+        // ラベル行を追加する関数
+        function addLabelRow(word, color, textColor) {
+            const wordLength = word.length;
+            let rows, labelsPerRow;
+
+            // 全角文字数に応じた配置
+            switch (wordLength) {
+                case 1:
+                    rows = 1;
+                    labelsPerRow = 15;
+                    break;
+                case 2:
+                    rows = 2;
+                    labelsPerRow = 14;
+                    break;
+                case 3:
+                    rows = 2;
+                    labelsPerRow = 10;
+                    break;
+                case 4:
+                    rows = 2;
+                    labelsPerRow = 8;
+                    break;
+                case 5:
+                    rows = 2;
+                    labelsPerRow = 7;
+                    break;
+                case 6:
+                    rows = 3;
+                    labelsPerRow = 6;
+                    break;
+                case 7:
+                    rows = 3;
+                    labelsPerRow = 5;
+                    break;
+                default:
+                    rows = 2;
+                    labelsPerRow = 5;
+            }
+
+            const rowGroup = [];
+
+            for (let r = 0; r < rows; r++) {
+                const row = document.createElement('div');
+                row.className = 'label-row';
+
+                for (let i = 0; i < labelsPerRow; i++) {
+                    const label = document.createElement('div');
+                    label.className = 'label';
+                    label.textContent = word;
+                    label.style.backgroundColor = color;
+                    label.style.color = textColor;
+                    row.appendChild(label);
+                }
+
+                // イベントリスナーを追加
+                row.addEventListener('click', (e) => {
+                    if (e.button === 0) { // 左クリック
+                        const newBgColor = prompt('背景色を16進数で入力（例: #FF5733）:', color);
+                        if (newBgColor) {
+                            const labels = row.querySelectorAll('.label');
+                            labels.forEach(l => l.style.backgroundColor = newBgColor);
+                        }
+                    } else if (e.button === 2) { // 右クリック
+                        e.preventDefault();
+                        const newTextColor = prompt('文字色を16進数で入力（例: #FFFFFF）:', textColor);
+                        if (newTextColor) {
+                            const labels = row.querySelectorAll('.label');
+                            labels.forEach(l => l.style.color = newTextColor);
+                        }
+                    }
+                });
+
+                row.addEventListener('auxclick', (e) => { // ミドルクリック
+                    if (e.button === 1) {
+                        e.preventDefault();
+                        row.remove();
+                    }
+                });
+
+                sheet.appendChild(row);
+                rowGroup.push(row);
+            }
+
+            return rowGroup;
+        }
+
+        // Enterキーで新しい行を追加
+        wordInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && wordInput.value.trim() !== '') {
+                const word = wordInput.value.trim();
+                const color = colors[Math.floor(Math.random() * colors.length)];
+                const textColor = '#000000';
+                addLabelRow(word, color, textColor);
+                saveToLocalStorage(word, color, textColor);
+
+                // 入力欄のスタイルを更新
+                wordInput.style.backgroundColor = color;
+                wordInput.style.color = textColor;
+
+                // 入力欄を空欄にする
+                wordInput.value = '';
+            }
+        });
+
+        // ページ読み込み時にLocalStorageからデータを読み込む
+        window.addEventListener('load', loadFromLocalStorage);
+    </script>
+</body>
+</html>
