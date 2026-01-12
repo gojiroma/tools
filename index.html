@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>誤字ロマの道具箱</title>
+    <style>
+        body {
+            font-family: "Yu Mincho", "Hiragino Mincho Pro", serif;
+            margin: 20px;
+            background-color: #4ECDC41A;
+            transition: background-color 0.5s;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+            font-family: "Yu Mincho", "Hiragino Mincho Pro", serif;
+            margin-bottom: 20px;
+        }
+        #search {
+            max-width: 600px;
+            width: 100%;
+            padding: 10px;
+            font-family: "Yu Mincho", "Hiragino Mincho Pro", serif;
+            font-size: 16px;
+            margin-bottom: 20px;
+            box-sizing: border-box;
+        }
+        #fileList {
+            width: 100%;
+            max-width: 600px;
+            padding: 0;
+            margin: 0 auto;
+        }
+        #fileList li {
+            padding: 10px;
+            margin: 5px 0;
+            background-color: #fff;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            transition: background-color 0.3s;
+            display: none;
+            list-style-type: none;
+            position: relative;
+        }
+        #fileList li.visible {
+            display: block;
+        }
+        #fileList li:hover {
+            background-color: #e9e9e9;
+        }
+        #fileList a {
+            text-decoration: none;
+            color: inherit;
+            display: block;
+        }
+        .date {
+            position: absolute;
+            top: 5px;
+            right: 10px;
+            font-size: 0.8em;
+            color: #999;
+        }
+        .description {
+            font-size: 0.9em;
+            color: #666;
+            margin-top: 5px;
+        }
+        .rss-link {
+            text-align: center;
+            margin-top: 20px;
+            width: 100%;
+            max-width: 600px;
+        }
+    </style>
+</head>
+<body>
+    <h1>誤字ロマの道具箱</h1>
+    <input type="text" id="search" placeholder="検索..." autofocus>
+    <ul id="fileList">
+        <li><div class="date">2026/01/12</div><a href="label.html">label</a><div class="description">A5縦方向のラベルシートを印刷するためのツール</div></li>
+    </ul>
+    <div class="rss-link">
+        <a href="rss.xml" target="_blank">RSSフィード</a>
+    </div>
+    <script>
+        // 初期表示で全項目を表示
+        document.querySelectorAll('#fileList li').forEach(item => {
+            item.classList.add('visible');
+        });
+
+        // 検索機能
+        document.getElementById('search').addEventListener('input', function() {
+            const searchTerm = this.value.toLowerCase();
+            const items = document.querySelectorAll('#fileList li');
+            let visibleCount = 0;
+            let lastVisibleItem = null;
+
+            items.forEach(item => {
+                const text = item.textContent.toLowerCase();
+                const isVisible = text.includes(searchTerm);
+                item.classList.toggle('visible', isVisible);
+                if (isVisible) {
+                    visibleCount++;
+                    lastVisibleItem = item;
+                }
+            });
+
+            // 検索結果が1つだけの場合はそのページを開く
+            if (visibleCount === 1 && searchTerm.length > 0) {
+                window.open(lastVisibleItem.querySelector('a').href, '_blank');
+            }
+        });
+    </script>
+</body>
+</html>

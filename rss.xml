@@ -1,0 +1,43 @@
+<?xml version="1.0" ?>
+<rss version="2.0">
+    
+    
+    <channel>
+        
+        
+        <title>誤字ロマの道具箱</title>
+        
+        
+        <link>https://example.com/</link>
+        
+        
+        <description>誤字ロマの道具箱 - HTMLファイル一覧</description>
+        
+        
+        <lastBuildDate>Mon, 12 Jan 2026 12:15:23 +0900</lastBuildDate>
+        
+        
+        
+        <item>
+            
+            
+            <title>label</title>
+            
+            
+            <link>label.html</link>
+            
+            
+            <pubDate>Mon, 12 Jan 2026 12:13:02 +0900</pubDate>
+            
+            
+            <description>A5縦方向のラベルシートを印刷するためのツール</description>
+            
+        
+        </item>
+        
+
+    
+    </channel>
+    
+
+</rss>
