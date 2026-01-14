@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Cosenseのアーカイブからデイリーページっぽいものを集約・表示">
+    <title>Cosenseデイリーログビューア</title>
+    <meta name="date" content="2026-01-14">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.5/purify.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            position: relative;
+        }
+
+        #topBar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 10;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 5px 10px;
+            background-color: #f0f0f0;
+            border-bottom: 1px solid #ccc;
+            height: 40px;
+            box-sizing: border-box;
+        }
+
+        #searchInput {
+            padding: 5px;
+            width: 200px;
+        }
+
+        #filePicker {
+            opacity: 1;
+        }
+
+        #dateCount {
+            margin-left: auto;
+            background-color: #eee;
+            padding: 2px 8px;
+            border-radius: 3px;
+            font-size: 12px;
+        }
+
+        #container {
+            display: flex;
+            flex-grow: 1;
+            margin-top: 40px;
+            margin-bottom: 100px;
+            height: calc(100vh - 140px);
+        }
+
+        #viewer {
+            background-color: #f9f9f9;
+            padding: 20px;
+            width: calc(100% - 150px);
+            height: 100%;
+            overflow-y: auto;
+            position: relative;
+        }
+
+        #viewerContent {
+            height: 100%;
+            overflow-y: auto;
+        }
+
+        #datepicker {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 100px;
+            background-color: #333;
+            overflow-x: auto;
+            overflow-y: hidden;
+            white-space: nowrap;
+            z-index: 20;
+            box-shadow: 0 -2px 5px rgba(0, 0, 0, 0.2);
+        }
+
+        .date-cell {
+            display: inline-block;
+            height: 100px;
+            margin: 0;
+            cursor: pointer;
+        }
+
+        .date-cell:hover,
+        .date-cell.selected {
+            background-color: #007BFF !important;
+        }
+
+        #viewer img {
+            max-width: 100%;
+            height: auto;
+            cursor: pointer;
+        }
+
+        #viewer h1 {
+            border-bottom: 1px solid #ccc;
+            padding-bottom: 10px;
+        }
+
+        .highlight {
+            background-color: yellow;
+            font-weight: bold;
+        }
+
+        #searchHistory {
+            width: 150px !important;
+            background-color: #f0f0f0;
+            border-left: 1px solid #ccc;
+            padding: 10px;
+            height: 100%;
+            overflow-y: auto;
+        }
+
+        .history-item {
+            padding: 5px;
+            cursor: pointer;
+            border-bottom: 1px solid #ddd;
+        }
+
+        .history-item:hover {
+            background-color: #ddd;
+        }
+
+        #currentDate {
+            position: fixed;
+            right: 20px;
+            bottom: 120px;
+            background-color: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 15px 25px;
+            border-radius: 10px;
+            font-size: 28px;
+            z-index: 15;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
+        }
+    </style>
+</head>
+
+<body>
+    <div id="topBar">
+        <input type="text" id="searchInput" placeholder="検索キーワードを入力" />
+        <input type="file" id="filePicker" accept=".json" />
+        <div id="dateCount"></div>
+    </div>
+    <div id="container">
+        <div id="viewer">
+            <div id="viewerContent"></div>
+        </div>
+        <div id="searchHistory"></div>
+    </div>
+    <div id="datepicker"></div>
+    <div id="currentDate"></div>
+
+    <script>
+        // IndexedDBのセットアップ
+        let db;
+        const DB_NAME = 'CosenseDailyLogDB';
+        const DB_VERSION = 1;
+        const STORE_NAME = 'logData';
+
+        // IndexedDBを開く
+        function openDB() {
+            return new Promise((resolve, reject) => {
+                const request = indexedDB.open(DB_NAME, DB_VERSION);
+
+                request.onupgradeneeded = (event) => {
+                    db = event.target.result;
+                    if (!db.objectStoreNames.contains(STORE_NAME)) {
+                        db.createObjectStore(STORE_NAME, { keyPath: 'id' });
+                    }
+                };
+
+                request.onsuccess = (event) => {
+                    db = event.target.result;
+                    resolve(db);
+                };
+
+                request.onerror = (event) => {
+                    console.error('IndexedDBを開けませんでした:', event.target.error);
+                    reject(event.target.error);
+                };
+            });
+        }
+
+        // データをIndexedDBに保存
+        async function saveToDB(data, key) {
+            return new Promise((resolve, reject) => {
+                const transaction = db.transaction(STORE_NAME, 'readwrite');
+                const store = transaction.objectStore(STORE_NAME);
+                const request = store.put({ id: key, data: data });
+
+                request.onsuccess = () => resolve();
+                request.onerror = (event) => reject(event.target.error);
+            });
+        }
+
+        // データをIndexedDBから読み込む
+        async function loadFromDB(key) {
+            return new Promise((resolve, reject) => {
+                const transaction = db.transaction(STORE_NAME, 'readonly');
+                const store = transaction.objectStore(STORE_NAME);
+                const request = store.get(key);
+
+                request.onsuccess = () => resolve(request.result?.data);
+                request.onerror = (event) => reject(event.target.error);
+            });
+        }
+
+        // JSONデータを保持する変数
+        let jsonData = null;
+        let titles = [];
+        let lastSelectedTitle = null;
+        let currentKeyword = null;
+        let searchHistory = [];
+
+        // IndexedDBからデータを読み込む
+        async function loadFromDBAll() {
+            try {
+                await openDB();
+                jsonData = await loadFromDB('jsonData');
+                lastSelectedTitle = await loadFromDB('lastSelectedTitle');
+                const history = await loadFromDB('searchHistory');
+                if (history) searchHistory = history;
+                renderSearchHistory();
+                if (jsonData) processData();
+            } catch (error) {
+                console.error('IndexedDBからの読み込みエラー:', error);
+            }
+        }
+
+        // IndexedDBにデータを保存
+        async function saveAllToDB() {
+            try {
+                await openDB();
+                if (jsonData) await saveToDB(jsonData, 'jsonData');
+                if (lastSelectedTitle) await saveToDB(lastSelectedTitle, 'lastSelectedTitle');
+                await saveToDB(searchHistory, 'searchHistory');
+            } catch (error) {
+                console.error('IndexedDBへの保存エラー:', error);
+            }
+        }
+
+        // ファイルピッカーのイベントリスナー
+        document.getElementById('filePicker').addEventListener('change', handleFileSelect, false);
+
+        // ファイル選択時の処理
+        async function handleFileSelect(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = async function (e) {
+                try {
+                    jsonData = JSON.parse(e.target.result);
+                    await saveAllToDB();
+                    processData();
+                } catch (error) {
+                    alert('JSONファイルの読み込みに失敗しました。');
+                    console.error("JSONパースエラー:", error);
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        // linesから日付を抽出
+        function extractDates() {
+            if (!jsonData || !jsonData.pages) return [];
+
+            const dateSet = new Set();
+
+            jsonData.pages.forEach(page => {
+                if (page.lines) {
+                    page.lines.forEach(line => {
+                        const lineMatch = line.match(/\[(\d{4}[\/\-]\d{2}[\/\-]\d{2})\]/);
+                        if (lineMatch) {
+                            dateSet.add(lineMatch[1]);
+                        }
+                    });
+                }
+            });
+
+            return Array.from(dateSet).sort((a, b) => a.localeCompare(b));
+        }
+
+        // titleを抽出（辞書順）
+        function extractTitles() {
+            if (!jsonData || !jsonData.pages) return [];
+
+            const titleSet = new Set();
+
+            jsonData.pages.forEach(page => {
+                titleSet.add(page.title);
+            });
+
+            return Array.from(titleSet).sort((a, b) => a.localeCompare(b));
+        }
+
+        // データ処理
+        function processData() {
+            titles = extractTitles();
+            const dates = extractDates();
+
+            if (titles.length === 0) return;
+
+            document.getElementById('dateCount').textContent = `${titles.length}件のデータ`;
+            renderTitlePicker(titles);
+        }
+
+        // タイトルピッカーを描画
+        function renderTitlePicker(titlesToRender) {
+            const datepicker = document.getElementById('datepicker');
+            datepicker.innerHTML = '';
+
+            const cellWidth = (100 / titlesToRender.length) + '%';
+
+            titlesToRender.forEach(title => {
+                const cell = document.createElement('div');
+                cell.className = 'date-cell';
+                cell.title = title;
+                cell.style.width = cellWidth;
+
+                // ハッシュ値を使って色を決定
+                let hash = 0;
+                for (let i = 0; i < title.length; i++) {
+                    hash = title.charCodeAt(i) + ((hash << 5) - hash);
+                }
+                const hue = Math.abs(hash) % 360;
+                cell.style.backgroundColor = `hsl(${hue}, 70%, 60%)`;
+
+                cell.addEventListener('mouseover', () => {
+                    document.querySelectorAll('.date-cell').forEach(c => c.classList.remove('selected'));
+                    cell.classList.add('selected');
+                    displayPage(title);
+                });
+
+                cell.addEventListener('click', () => {
+                    lastSelectedTitle = title;
+                    saveAllToDB();
+                });
+                datepicker.appendChild(cell);
+            });
+
+            const initialTitle = lastSelectedTitle || titlesToRender[0];
+            displayPage(initialTitle);
+        }
+
+        // 指定されたタイトルに関連するページを取得
+        function getPagesForTitle(title) {
+            return jsonData.pages.filter(page => {
+                return page.title === title;
+            });
+        }
+
+        // ページ表示
+        function displayPage(title) {
+            const pages = getPagesForTitle(title);
+            if (pages.length === 0) return;
+
+            let markdownContent = '';
+            pages.forEach(page => {
+                markdownContent += `# ${page.title}\n\n${convertCosenseToMarkdown(page.lines)}\n\n---\n\n`;
+            });
+
+            // markedのレンダラーを設定
+            const renderer = new marked.Renderer();
+            renderer.image = function(href, title, text) {
+                return `<img src="${href}" alt="${text || ''}" style="max-width: 100%; height: auto;">`;
+            };
+
+            // markedのオプションを設定
+            marked.setOptions({
+                renderer: renderer,
+                gfm: true,
+                breaks: true,
+            });
+
+            // DOMPurifyでimgタグを許可
+            const cleanHTML = DOMPurify.sanitize(marked.parse(markdownContent), {
+                ALLOWED_TAGS: ['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'ul', 'ol', 'li', 'strong', 'em', 'del', 'a', 'img', 'br', 'hr'],
+                ALLOWED_ATTR: ['href', 'src', 'alt', 'style'],
+            });
+
+            document.getElementById('viewerContent').innerHTML = cleanHTML;
+            document.getElementById('currentDate').textContent = title;
+
+            if (currentKeyword) highlightAndScroll(currentKeyword);
+        }
+
+        // Cosense記法をMarkdownに変換
+        function convertCosenseToMarkdown(lines) {
+            return lines.map(line => {
+                // rdl.inkのURLをimgタグに変換し、末尾の#.pngを削除
+                line = line.replace(/\[(https:\/\/rdl\.ink\/[^\s#]+)[^\]]*\]/g, (match, url) => {
+                    const cleanUrl = url.replace(/#\..*$/, '');
+                    return `![image](${cleanUrl})`;
+                });
+
+                line = line.replace(/\[(https:\/\/gyazo\.com\/[a-f0-9]+)\]/g, (match, url) => {
+                    const hash = url.split('/').pop();
+                    return `![image](https://i.gyazo.com/${hash}.jpg)`;
+                });
+
+                line = line.replace(/\[([^\]]+)\]/g, (match, text) => {
+                    if (/^\d{4}[\/\-]\d{2}[\/\-]\d{2}$/.test(text)) return text;
+                    if (text.startsWith('https://gyazo.com/')) {
+                        const hash = text.split('/').pop();
+                        return `![image](https://i.gyazo.com/${hash}.jpg)`;
+                    }
+                    return `**${text}**`;
+                });
+
+                line = line.replace(/\*\*(\*\*+ (.+))\]/g, '# $2');
+                line = line.replace(/([^ ]+) (http.+)/g, '[$1]($2)');
+                line = line.replace(/^- (.+)]/g, '~~$1~~');
+                line = line.replace(/\*\/ (.+)]/g, '***$1***');
+                line = line.replace(/\* (.+)]/g, '**$1**');
+                if (line.startsWith(' ')) line = '- ' + line.trim();
+                return line;
+            }).join('\n');
+        }
+
+        // 検索履歴を描画
+        function renderSearchHistory() {
+            const searchHistoryElement = document.getElementById('searchHistory');
+            searchHistoryElement.innerHTML = '';
+
+            searchHistory.forEach(keyword => {
+                const item = document.createElement('div');
+                item.className = 'history-item';
+                item.textContent = keyword;
+
+                item.addEventListener('mouseover', () => {
+                    document.getElementById('searchInput').value = keyword;
+                });
+
+                item.addEventListener('click', () => {
+                    document.getElementById('searchInput').value = keyword;
+                    searchAndHighlight(keyword);
+                });
+
+                searchHistoryElement.appendChild(item);
+            });
+        }
+
+        // 検索とハイライト
+        function searchAndHighlight(keyword) {
+            currentKeyword = keyword;
+
+            if (!keyword) {
+                renderTitlePicker(titles);
+                return;
+            }
+
+            const matchedTitles = new Set();
+            jsonData.pages.forEach(page => {
+                if (page.title.includes(keyword) || (page.lines && page.lines.some(line => line.includes(keyword)))) {
+                    matchedTitles.add(page.title);
+                }
+            });
+
+            if (matchedTitles.size > 0) {
+                renderTitlePicker(Array.from(matchedTitles).sort((a, b) => a.localeCompare(b)));
+                highlightAndScroll(keyword);
+            }
+        }
+
+        // キーワードハイライトとスクロール
+        function highlightAndScroll(keyword) {
+            const viewer = document.getElementById('viewerContent');
+            const regex = new RegExp(keyword, 'gi');
+            const content = viewer.innerHTML;
+            viewer.innerHTML = content.replace(regex, match => `<span class="highlight">${match}</span>`);
+
+            const highlightElement = document.querySelector('.highlight');
+            if (highlightElement) highlightElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+
+        // インクリメンタルサーチ
+        let debounceTimer;
+        document.getElementById('searchInput').addEventListener('input', (e) => {
+            const keyword = e.target.value.trim();
+            clearTimeout(debounceTimer);
+
+            debounceTimer = setTimeout(() => {
+                if (keyword && !searchHistory.includes(keyword)) {
+                    searchHistory.unshift(keyword);
+                    if (searchHistory.length > 10) searchHistory.pop();
+                    renderSearchHistory();
+                    saveAllToDB();
+                }
+                searchAndHighlight(keyword);
+            }, 1000);
+        });
+
+        // ページ読み込み時にIndexedDBからデータを読み込む
+        window.onload = loadFromDBAll;
+    </script>
+</body>
+
+</html>

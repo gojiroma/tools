@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="JSONから複数条件でページを抽出">
+    <title>Cosense JSON Filter</title>
+    <meta name="date" content="2026-01-14">
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            flex-direction: column;
+        }
+
+        #header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        #condition-form {
+            margin-bottom: 20px;
+            padding: 20px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            background-color: #f9f9f9;
+        }
+
+        #conditions-container {
+            margin-bottom: 10px;
+        }
+
+        .condition-row {
+            margin-bottom: 5px;
+        }
+
+        #status {
+            margin-top: 20px;
+            font-size: 16px;
+            color: #666;
+        }
+
+        label {
+            margin-right: 10px;
+        }
+
+        select, input {
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+
+        button {
+            padding: 8px 16px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background-color: #45a049;
+        }
+
+        .remove-btn {
+            background-color: #f44336;
+        }
+
+        .remove-btn:hover {
+            background-color: #d32f2f;
+        }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+</head>
+
+<body>
+    <div id="header">
+        <h2>Cosense JSON Filter</h2>
+        <input type="file" id="filePicker" accept=".json" />
+        <div id="condition-form">
+            <div id="conditions-container">
+                <div class="condition-row">
+                    <label for="target0">対象:</label>
+                    <select class="target" id="target0">
+                        <option value="title">title</option>
+                        <option value="lines">lines</option>
+                    </select>
+                    <label for="condition0">条件:</label>
+                    <select class="condition" id="condition0">
+                        <option value="startsWith">から始まる</option>
+                        <option value="includes">を含む</option>
+                    </select>
+                    <label for="keyword0">キーワード:</label>
+                    <input type="text" class="keyword" id="keyword0" placeholder="キーワードを入力">
+                    <button type="button" class="remove-btn" onclick="removeCondition(this)">削除</button>
+                </div>
+            </div>
+            <button type="button" id="addCondition">条件を追加</button>
+            <div>
+                <label for="logic">論理演算子:</label>
+                <select id="logic">
+                    <option value="AND">AND</option>
+                    <option value="OR">OR</option>
+                </select>
+            </div>
+            <button id="filterButton">抽出</button>
+        </div>
+        <div id="status"></div>
+    </div>
+    <script>
+        // JSONデータを保持する変数
+        let jsonData = null;
+        // 条件に合致したデータ
+        let matchedData = { pages: [] };
+        // 条件に合致しなかったデータ
+        let unmatchedData = { pages: [] };
+
+        // ファイル読み込み処理
+        document.getElementById('filePicker').addEventListener('change', function (e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const statusElement = document.getElementById('status');
+            statusElement.textContent = 'ファイルを読み込み中...';
+
+            const reader = new FileReader();
+            reader.onload = function (e) {
+                try {
+                    jsonData = JSON.parse(e.target.result);
+                    // pagesが存在しない場合のエラー処理
+                    if (!jsonData.pages) {
+                        throw new Error('JSONファイルに "pages" が見つかりません。');
+                    }
+                    statusElement.textContent = 'ファイルを読み込みました。条件を指定して「抽出」ボタンを押してください。';
+                } catch (error) {
+                    statusElement.textContent = `エラー: ${error.message}`;
+                    alert(`エラー: ${error.message}`);
+                }
+            };
+            reader.readAsText(file);
+        });
+
+        // 条件を追加する関数
+        document.getElementById('addCondition').addEventListener('click', function () {
+            const container = document.getElementById('conditions-container');
+            const rowCount = container.children.length;
+            const newRow = document.createElement('div');
+            newRow.className = 'condition-row';
+            newRow.innerHTML = `
+                <label for="target${rowCount}">対象:</label>
+                <select class="target" id="target${rowCount}">
+                    <option value="title">title</option>
+                    <option value="lines">lines</option>
+                </select>
+                <label for="condition${rowCount}">条件:</label>
+                <select class="condition" id="condition${rowCount}">
+                    <option value="startsWith">から始まる</option>
+                    <option value="includes">を含む</option>
+                </select>
+                <label for="keyword${rowCount}">キーワード:</label>
+                <input type="text" class="keyword" id="keyword${rowCount}" placeholder="キーワードを入力">
+                <button type="button" class="remove-btn" onclick="removeCondition(this)">削除</button>
+            `;
+            container.appendChild(newRow);
+        });
+
+        // 条件を削除する関数
+        function removeCondition(button) {
+            const row = button.parentNode;
+            row.parentNode.removeChild(row);
+        }
+
+        // 抽出ボタンのクリックイベント
+        document.getElementById('filterButton').addEventListener('click', function () {
+            if (!jsonData) {
+                alert('まずJSONファイルを読み込んでください。');
+                return;
+            }
+
+            const rows = document.querySelectorAll('.condition-row');
+            const conditions = [];
+            let hasEmptyKeyword = false;
+
+            rows.forEach(row => {
+                const target = row.querySelector('.target').value;
+                const condition = row.querySelector('.condition').value;
+                const keyword = row.querySelector('.keyword').value;
+
+                if (!keyword) {
+                    hasEmptyKeyword = true;
+                }
+
+                conditions.push({ target, condition, keyword });
+            });
+
+            if (hasEmptyKeyword) {
+                alert('すべてのキーワードを入力してください。');
+                return;
+            }
+
+            const logic = document.getElementById('logic').value;
+            filterData(conditions, logic);
+            downloadJSON(matchedData, 'matched_data.json');
+            setTimeout(() => {
+                downloadJSON(unmatchedData, 'unmatched_data.json');
+                document.getElementById('status').textContent = 'ダウンロードが完了しました。';
+            }, 1000);
+        });
+
+        // データをフィルタリングする関数
+        function filterData(conditions, logic) {
+            matchedData.pages = [];
+            unmatchedData.pages = [];
+
+            jsonData.pages.forEach(page => {
+                let isMatch = logic === 'AND' ? true : false;
+
+                conditions.forEach(cond => {
+                    let currentMatch = false;
+
+                    if (cond.target === 'title') {
+                        if (cond.condition === 'startsWith') {
+                            currentMatch = page.title.startsWith(cond.keyword);
+                        } else if (cond.condition === 'includes') {
+                            currentMatch = page.title.includes(cond.keyword);
+                        }
+                    } else if (cond.target === 'lines') {
+                        if (cond.condition === 'startsWith') {
+                            currentMatch = page.lines && page.lines.some(line => line.startsWith(cond.keyword));
+                        } else if (cond.condition === 'includes') {
+                            currentMatch = page.lines && page.lines.some(line => line.includes(cond.keyword));
+                        }
+                    }
+
+                    if (logic === 'AND') {
+                        isMatch = isMatch && currentMatch;
+                    } else {
+                        isMatch = isMatch || currentMatch;
+                    }
+                });
+
+                if (isMatch) {
+                    matchedData.pages.push(page);
+                } else {
+                    unmatchedData.pages.push(page);
+                }
+            });
+        }
+
+        // JSONファイルをダウンロードする関数
+        function downloadJSON(data, filename) {
+            const dataStr = JSON.stringify(data, null, 2);
+            const blob = new Blob([dataStr], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        // ファイルドロップで読み込み
+        document.addEventListener('dragover', (e) => {
+            e.preventDefault();
+        });
+        document.addEventListener('drop', (e) => {
+            e.preventDefault();
+            if (e.dataTransfer.files.length) {
+                document.getElementById('filePicker').files = e.dataTransfer.files;
+                document.getElementById('filePicker').dispatchEvent(new Event('change'));
+            }
+        });
+    </script>
+</body>
+
+</html>
