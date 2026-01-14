@@ -50,7 +50,8 @@
             margin-right: 10px;
         }
 
-        select, input {
+        select,
+        input {
             margin-right: 10px;
             margin-bottom: 10px;
         }
@@ -95,6 +96,7 @@
                     <select class="condition" id="condition0">
                         <option value="startsWith">から始まる</option>
                         <option value="includes">を含む</option>
+                        <option value="notIncludes">を含まない</option>
                     </select>
                     <label for="keyword0">キーワード:</label>
                     <input type="text" class="keyword" id="keyword0" placeholder="キーワードを入力">
@@ -162,6 +164,7 @@
                 <select class="condition" id="condition${rowCount}">
                     <option value="startsWith">から始まる</option>
                     <option value="includes">を含む</option>
+                    <option value="notIncludes">を含まない</option>
                 </select>
                 <label for="keyword${rowCount}">キーワード:</label>
                 <input type="text" class="keyword" id="keyword${rowCount}" placeholder="キーワードを入力">
@@ -229,12 +232,16 @@
                             currentMatch = page.title.startsWith(cond.keyword);
                         } else if (cond.condition === 'includes') {
                             currentMatch = page.title.includes(cond.keyword);
+                        } else if (cond.condition === 'notIncludes') {
+                            currentMatch = !page.title.includes(cond.keyword);
                         }
                     } else if (cond.target === 'lines') {
                         if (cond.condition === 'startsWith') {
                             currentMatch = page.lines && page.lines.some(line => line.startsWith(cond.keyword));
                         } else if (cond.condition === 'includes') {
                             currentMatch = page.lines && page.lines.some(line => line.includes(cond.keyword));
+                        } else if (cond.condition === 'notIncludes') {
+                            currentMatch = !page.lines || !page.lines.some(line => line.includes(cond.keyword));
                         }
                     }
 
