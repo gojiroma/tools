@@ -14,7 +14,7 @@
         <description>生活を楽しくする小物たちを公開</description>
         
         
-        <lastBuildDate>Wed, 14 Jan 2026 04:36:24 +0900</lastBuildDate>
+        <lastBuildDate>Wed, 14 Jan 2026 04:40:03 +0900</lastBuildDate>
         
         
         
@@ -27,7 +27,7 @@
             <link>cosenseDailyPageViewer.html</link>
             
             
-            <pubDate>Wed, 14 Jan 2026 04:36:20 +0900</pubDate>
+            <pubDate>Wed, 14 Jan 2026 00:00:00 +0900</pubDate>
             
             
             <description>Cosenseのアーカイブからデイリーページっぽいものを集約・表示</description>
@@ -47,7 +47,7 @@
             <link>getDailyPagesfromCosenseJSON.html</link>
             
             
-            <pubDate>Wed, 14 Jan 2026 04:36:20 +0900</pubDate>
+            <pubDate>Wed, 14 Jan 2026 00:00:00 +0900</pubDate>
             
             
             <description>CosenseのアーカイブJSONからデイリーログを抽出</description>
@@ -67,7 +67,7 @@
             <link>label.html</link>
             
             
-            <pubDate>Wed, 14 Jan 2026 04:36:20 +0900</pubDate>
+            <pubDate>Mon, 12 Jan 2026 00:00:00 +0900</pubDate>
             
             
             <description>A5縦方向のラベルシートを印刷するためのツール</description>
