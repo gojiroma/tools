@@ -162,25 +162,30 @@ def get_html_files():
     for file in os.listdir('.'):
         if file.endswith('.html') and file != 'index.html':
             base_name = os.path.splitext(file)[0]
-            ctime = os.path.getctime(file)  # 作成日時
-            mtime = os.path.getmtime(file)  # 更新日時
-            description = get_meta_description(file)
-            files.append((file, base_name, ctime, mtime, description))
+            date, description = get_meta_info(file)
+            files.append((file, base_name, date, description))
     return sorted(files, key=lambda x: x[1])
 
-def get_meta_description(filename):
-    """HTMLファイルからmeta descriptionを取得"""
+def get_meta_info(filename):
+    """HTMLファイルからmeta dateとmeta descriptionを取得"""
     try:
         with open(filename, 'r', encoding='utf-8') as f:
             soup = BeautifulSoup(f.read(), 'html.parser')
-            meta = soup.find('meta', attrs={'name': 'description'})
-            return meta['content'] if meta else '説明文がありません。'
+            meta_date = soup.find('meta', attrs={'name': 'date'})
+            meta_desc = soup.find('meta', attrs={'name': 'description'})
+            date = meta_date['content'] if meta_date else format_date(os.path.getctime(filename))
+            description = meta_desc['content'] if meta_desc else '説明文がありません。'
+            return date, description
     except Exception:
-        return '説明文がありません。'
+        return format_date(os.path.getctime(filename)), '説明文がありません。'
 
-def format_date(timestamp):
-    """タイムスタンプをYYYY/MM/DD形式に変換"""
-    return datetime.datetime.fromtimestamp(timestamp).strftime('%Y/%m/%d')
+def format_date(date_str):
+    """YYYY-MM-DD形式の文字列をRSS用の形式に変換"""
+    try:
+        dt = datetime.datetime.strptime(date_str, '%Y-%m-%d')
+        return dt.strftime('%a, %d %b %Y %H:%M:%S +0900')
+    except ValueError:
+        return datetime.datetime.fromtimestamp(os.path.getctime(date_str)).strftime('%a, %d %b %Y %H:%M:%S +0900')
 
 def generate_html_and_rss():
     """index.htmlとrss.xmlを生成"""
@@ -197,11 +202,11 @@ def generate_html_and_rss():
     rss_items = []
     now = datetime.datetime.now()
 
-    for file, base_name, ctime, mtime, description in files:
-        created_date = format_date(ctime)
-        pub_date = datetime.datetime.fromtimestamp(mtime).strftime('%a, %d %b %Y %H:%M:%S +0900')
+    for file, base_name, date, description in files:
+        display_date = date.replace('-', '/')
+        pub_date = format_date(date)
         html_items.append(
-            f'<li><div class="date">{created_date}</div><a href="{file}">{base_name}</a><div class="description">{description}</div></li>'
+            f'<li><div class="date">{display_date}</div><a href="{file}">{base_name}</a><div class="description">{description}</div></li>'
         )
         rss_items.append(RSS_ITEM_TEMPLATE.format(base_name, file, pub_date, description))
 
