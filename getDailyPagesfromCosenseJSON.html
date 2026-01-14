@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="CosenseのアーカイブJSONからデイリーログを抽出">
+    <title>デイリーログ抽出ツール</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            flex-direction: column;
+        }
+
+        #header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        #status {
+            margin-top: 20px;
+            font-size: 16px;
+            color: #666;
+        }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+</head>
+
+<body>
+    <div id="header">
+        <h2>デイリーログ抽出ツール</h2>
+        <input type="file" id="filePicker" accept=".json" />
+        <div id="status"></div>
+    </div>
+    <script>
+        // JSONデータを保持する変数
+        let jsonData = null;
+        // 条件に合致したデータ
+        let matchedData = { pages: [] };
+        // 条件に合致しなかったデータ
+        let unmatchedData = { pages: [] };
+
+        // ファイル読み込み処理
+        document.getElementById('filePicker').addEventListener('change', function (e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const statusElement = document.getElementById('status');
+            statusElement.textContent = 'ファイルを読み込み中...';
+
+            const reader = new FileReader();
+            reader.onload = function (e) {
+                try {
+                    jsonData = JSON.parse(e.target.result);
+                    // pagesが存在しない場合のエラー処理
+                    if (!jsonData.pages) {
+                        throw new Error('JSONファイルに "pages" が見つかりません。');
+                    }
+                    // データをフィルタリング
+                    filterData();
+                    // 自動ダウンロード
+                    setTimeout(() => {
+                        downloadJSON(matchedData, 'matched_data.json');
+                        setTimeout(() => {
+                            downloadJSON(unmatchedData, 'unmatched_data.json');
+                            statusElement.textContent = 'ダウンロードが完了しました。';
+                        }, 1000);
+                    }, 500);
+                } catch (error) {
+                    statusElement.textContent = `エラー: ${error.message}`;
+                    alert(`エラー: ${error.message}`);
+                }
+            };
+            reader.readAsText(file);
+        });
+
+        // データをフィルタリングする関数
+        function filterData() {
+            matchedData.pages = [];
+            unmatchedData.pages = [];
+
+            jsonData.pages.forEach(page => {
+                // タイトルがYYYY/MM/DDまたはYYYY-MM-DDから始まるか、linesに[YYYY/MM/DD]または[YYYY-MM-DD]が含まれるかをチェック
+                const isTitleMatch = /^\d{4}[/-]\d{2}[/-]\d{2}/.test(page.title);
+                const isLineMatch = page.lines && page.lines.some(line =>
+                    /\[\d{4}[/-]\d{2}[/-]\d{2}\]/.test(line)
+                );
+
+                if (isTitleMatch || isLineMatch) {
+                    matchedData.pages.push(page);
+                } else {
+                    unmatchedData.pages.push(page);
+                }
+            });
+        }
+
+        // JSONファイルをダウンロードする関数
+        function downloadJSON(data, filename) {
+            const dataStr = JSON.stringify(data, null, 2);
+            const blob = new Blob([dataStr], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        // ファイルドロップで読み込み
+        document.addEventListener('dragover', (e) => {
+            e.preventDefault();
+        });
+        document.addEventListener('drop', (e) => {
+            e.preventDefault();
+            if (e.dataTransfer.files.length) {
+                document.getElementById('filePicker').files = e.dataTransfer.files;
+                document.getElementById('filePicker').dispatchEvent(new Event('change'));
+            }
+        });
+    </script>
+</body>
+
+</html>
