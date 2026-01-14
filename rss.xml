@@ -8,15 +8,55 @@
         <title>誤字ロマの道具箱</title>
         
         
-        <link>https://example.com/</link>
+        <link>https://tools.poet.blue/</link>
         
         
-        <description>誤字ロマの道具箱 - HTMLファイル一覧</description>
+        <description>生活を楽しくする小物たちを公開</description>
         
         
-        <lastBuildDate>Mon, 12 Jan 2026 12:15:23 +0900</lastBuildDate>
+        <lastBuildDate>Wed, 14 Jan 2026 04:21:36 +0900</lastBuildDate>
         
         
+        
+        <item>
+            
+            
+            <title>cosenseDailyPageViewer</title>
+            
+            
+            <link>cosenseDailyPageViewer.html</link>
+            
+            
+            <pubDate>Wed, 14 Jan 2026 04:21:29 +0900</pubDate>
+            
+            
+            <description>説明文がありません。</description>
+            
+        
+        </item>
+        
+
+
+        
+        <item>
+            
+            
+            <title>getDailyPagesfromCosenseJSON</title>
+            
+            
+            <link>getDailyPagesfromCosenseJSON.html</link>
+            
+            
+            <pubDate>Wed, 14 Jan 2026 04:21:29 +0900</pubDate>
+            
+            
+            <description>CosenseのアーカイブJSONからデイリーログを抽出</description>
+            
+        
+        </item>
+        
+
+
         
         <item>
             
@@ -27,7 +67,7 @@
             <link>label.html</link>
             
             
-            <pubDate>Mon, 12 Jan 2026 12:13:02 +0900</pubDate>
+            <pubDate>Wed, 14 Jan 2026 04:21:29 +0900</pubDate>
             
             
             <description>A5縦方向のラベルシートを印刷するためのツール</description>
