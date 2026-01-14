@@ -6,7 +6,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Cosenseデイリーログビューア</title>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.5/purify.min.js"></script>
     <style>
+        /* 省略（スタイルは変更なし） */
         body {
             font-family: Arial, sans-serif;
             margin: 0;
@@ -82,7 +84,8 @@
             overflow-x: auto;
             overflow-y: hidden;
             white-space: nowrap;
-            z-index: 10;
+            z-index: 20;
+            box-shadow: 0 -2px 5px rgba(0, 0, 0, 0.2);
         }
 
         .date-cell {
@@ -134,14 +137,15 @@
 
         #currentDate {
             position: fixed;
-            right: 170px;
-            bottom: 110px;
-            background-color: rgba(0, 0, 0, 0.5);
+            right: 20px;
+            bottom: 120px;
+            background-color: rgba(0, 0, 0, 0.7);
             color: white;
-            padding: 10px 20px;
-            border-radius: 5px;
-            font-size: 24px;
-            z-index: 5;
+            padding: 15px 25px;
+            border-radius: 10px;
+            font-size: 28px;
+            z-index: 15;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
         }
     </style>
 </head>
@@ -162,6 +166,60 @@
     <div id="currentDate"></div>
 
     <script>
+        // IndexedDBのセットアップ
+        let db;
+        const DB_NAME = 'CosenseDailyLogDB';
+        const DB_VERSION = 1;
+        const STORE_NAME = 'logData';
+
+        // IndexedDBを開く
+        function openDB() {
+            return new Promise((resolve, reject) => {
+                const request = indexedDB.open(DB_NAME, DB_VERSION);
+
+                request.onupgradeneeded = (event) => {
+                    db = event.target.result;
+                    if (!db.objectStoreNames.contains(STORE_NAME)) {
+                        db.createObjectStore(STORE_NAME, { keyPath: 'id' });
+                    }
+                };
+
+                request.onsuccess = (event) => {
+                    db = event.target.result;
+                    resolve(db);
+                };
+
+                request.onerror = (event) => {
+                    console.error('IndexedDBを開けませんでした:', event.target.error);
+                    reject(event.target.error);
+                };
+            });
+        }
+
+        // データをIndexedDBに保存
+        async function saveToDB(data, key) {
+            return new Promise((resolve, reject) => {
+                const transaction = db.transaction(STORE_NAME, 'readwrite');
+                const store = transaction.objectStore(STORE_NAME);
+                const request = store.put({ id: key, data: data });
+
+                request.onsuccess = () => resolve();
+                request.onerror = (event) => reject(event.target.error);
+            });
+        }
+
+        // データをIndexedDBから読み込む
+        async function loadFromDB(key) {
+            return new Promise((resolve, reject) => {
+                const transaction = db.transaction(STORE_NAME, 'readonly');
+                const store = transaction.objectStore(STORE_NAME);
+                const request = store.get(key);
+
+                request.onsuccess = () => resolve(request.result?.data);
+                request.onerror = (event) => reject(event.target.error);
+            });
+        }
+
         // JSONデータを保持する変数
         let jsonData = null;
         let dates = [];
@@ -176,51 +234,50 @@
             return days[date.getDay()];
         }
 
-        // LocalStorageからデータを読み込む
-        function loadFromLocalStorage() {
-            const savedData = localStorage.getItem('cosenseDailyLogData');
-            const savedLastSelectedDate = localStorage.getItem('cosenseLastSelectedDate');
-            const savedSearchHistory = localStorage.getItem('cosenseSearchHistory');
-            if (savedData) {
-                jsonData = JSON.parse(savedData);
-                processData();
-            }
-            if (savedLastSelectedDate) {
-                lastSelectedDate = savedLastSelectedDate;
-            }
-            if (savedSearchHistory) {
-                searchHistory = JSON.parse(savedSearchHistory);
+        // IndexedDBからデータを読み込む
+        async function loadFromDBAll() {
+            try {
+                await openDB();
+                jsonData = await loadFromDB('jsonData');
+                lastSelectedDate = await loadFromDB('lastSelectedDate');
+                const history = await loadFromDB('searchHistory');
+                if (history) searchHistory = history;
                 renderSearchHistory();
+                if (jsonData) processData();
+            } catch (error) {
+                console.error('IndexedDBからの読み込みエラー:', error);
             }
         }
 
-        // LocalStorageにデータを保存
-        function saveToLocalStorage() {
-            if (jsonData) {
-                localStorage.setItem('cosenseDailyLogData', JSON.stringify(jsonData));
+        // IndexedDBにデータを保存
+        async function saveAllToDB() {
+            try {
+                await openDB();
+                if (jsonData) await saveToDB(jsonData, 'jsonData');
+                if (lastSelectedDate) await saveToDB(lastSelectedDate, 'lastSelectedDate');
+                await saveToDB(searchHistory, 'searchHistory');
+            } catch (error) {
+                console.error('IndexedDBへの保存エラー:', error);
             }
-            if (lastSelectedDate) {
-                localStorage.setItem('cosenseLastSelectedDate', lastSelectedDate);
-            }
-            localStorage.setItem('cosenseSearchHistory', JSON.stringify(searchHistory));
         }
 
         // ファイルピッカーのイベントリスナー
         document.getElementById('filePicker').addEventListener('change', handleFileSelect, false);
 
         // ファイル選択時の処理
-        function handleFileSelect(e) {
+        async function handleFileSelect(e) {
             const file = e.target.files[0];
             if (!file) return;
 
             const reader = new FileReader();
-            reader.onload = function (e) {
+            reader.onload = async function (e) {
                 try {
                     jsonData = JSON.parse(e.target.result);
-                    saveToLocalStorage();
+                    await saveAllToDB();
                     processData();
                 } catch (error) {
                     alert('JSONファイルの読み込みに失敗しました。');
+                    console.error("JSONパースエラー:", error);
                 }
             };
             reader.readAsText(file);
@@ -233,13 +290,11 @@
             const dateSet = new Set();
 
             jsonData.pages.forEach(page => {
-                // titleから日付を抽出
                 const titleMatch = page.title.match(/^(\d{4}[\/\-]\d{2}[\/\-]\d{2})/);
                 if (titleMatch) {
                     dateSet.add(titleMatch[1]);
                 }
 
-                // linesから日付を抽出
                 if (page.lines) {
                     page.lines.forEach(line => {
                         const lineMatch = line.match(/\[(\d{4}[\/\-]\d{2}[\/\-]\d{2})\]/);
@@ -259,10 +314,7 @@
 
             if (dates.length === 0) return;
 
-            // 日数を表示
             document.getElementById('dateCount').textContent = `${dates.length}日分のデータ`;
-
-            // デートピッカーを生成
             renderDatePicker(dates);
         }
 
@@ -271,7 +323,6 @@
             const datepicker = document.getElementById('datepicker');
             datepicker.innerHTML = '';
 
-            // セルの幅を動的に計算
             const cellWidth = (100 / datesToRender.length) + '%';
 
             datesToRender.forEach(date => {
@@ -280,28 +331,24 @@
                 cell.title = `${date} ${getDayOfWeek(date)}`;
                 cell.style.width = cellWidth;
 
-                // 年月ごとに背景色を設定
                 const [year, month] = date.replace(/-/g, '/').split('/').map(Number);
-                const hue = (year % 10) * 30; // 年ごとに Hue を変化
-                const brightness = 30 + (month % 12) * 5; // 月ごとに Brightness を変化
+                const hue = (year % 10) * 30;
+                const brightness = 30 + (month % 12) * 5;
                 cell.style.backgroundColor = `hsl(${hue}, 70%, ${brightness}%)`;
 
-                // マウスホバー時のイベント
                 cell.addEventListener('mouseover', () => {
                     document.querySelectorAll('.date-cell').forEach(c => c.classList.remove('selected'));
                     cell.classList.add('selected');
                     displayPage(date);
                 });
 
-                // クリック時のイベント
                 cell.addEventListener('click', () => {
                     lastSelectedDate = date;
-                    saveToLocalStorage();
+                    saveAllToDB();
                 });
                 datepicker.appendChild(cell);
             });
 
-            // 保存された最終表示日付または最新の日付を初期表示
             const initialDate = lastSelectedDate || datesToRender[datesToRender.length - 1];
             displayPage(initialDate);
         }
@@ -310,9 +357,7 @@
         function getPagesForDate(date) {
             return jsonData.pages.filter(page => {
                 const titleMatch = page.title.match(/^(\d{4}[\/\-]\d{2}[\/\-]\d{2})/);
-                if (titleMatch && titleMatch[1] === date) {
-                    return true;
-                }
+                if (titleMatch && titleMatch[1] === date) return true;
 
                 if (page.lines) {
                     return page.lines.some(line => line.includes(`[${date}]`));
@@ -333,51 +378,47 @@
                 markdownContent += `# ${page.title} ${dayOfWeek}\n\n${convertCosenseToMarkdown(page.lines)}\n\n---\n\n`;
             });
 
-            document.getElementById('viewerContent').innerHTML = marked.parse(markdownContent);
+            // markedのオプションを設定し、スタイルやクラスを無効化
+            marked.setOptions({
+                sanitize: true,  // スタイルやスクリプトを削除
+                breaks: true,    // 改行を<br>に変換
+                gfm: true,       // GitHub Flavored Markdownを有効化
+            });
 
-            // 現在閲覧中の日付を表示
+            // DOMPurifyでさらにサニタイズし、スタイル属性を削除
+            const cleanHTML = DOMPurify.sanitize(marked.parse(markdownContent), {
+                ALLOWED_ATTR: [],  // 許可する属性を空にして、すべての属性を削除
+            });
+
+            document.getElementById('viewerContent').innerHTML = cleanHTML;
             document.getElementById('currentDate').textContent = date;
 
-            // キーワードがあればハイライトとスクロール
-            if (currentKeyword) {
-                highlightAndScroll(currentKeyword);
-            }
+            if (currentKeyword) highlightAndScroll(currentKeyword);
         }
 
         // Cosense記法をMarkdownに変換
         function convertCosenseToMarkdown(lines) {
             return lines.map(line => {
-                // [] の削除と [YYYY/MM/DD] または [YYYY-MM-DD] の先頭で改行を追加
-                line = line.replace(/\[(\d{4}[\/\-]\d{2}[\/\-]\d{2})\]/g, '\n$1');
-                line = line.replace(/\[|\]/g, '');
-
-                // GyazoのURL置換（404対応）
-                line = line.replace(/https:\/\/gyazo\.com\/([a-f0-9]+)/g, (match, hash) => {
-                    return `![image](https://i.gyazo.com/${hash}.jpg onerror="this.src='https://i.gyazo.com/${hash}.png'")`;
+                line = line.replace(/\[(https:\/\/gyazo\.com\/[a-f0-9]+)\]/g, (match, url) => {
+                    const hash = url.split('/').pop();
+                    return `![image](https://i.gyazo.com/${hash}.jpg)`;
                 });
 
-                // 見出し
-                line = line.replace(/\*\*(\*\*+ (.+))\]/g, '# $2');
-                // 画像リンク
-                line = line.replace(/(https?:\/\/[^\s]+)/g, (url) => {
-                    if (url.startsWith('https://i.gyazo.com/')) {
-                        return `![image](${url})`;
-                    } else {
-                        return url;
+                line = line.replace(/\[([^\]]+)\]/g, (match, text) => {
+                    if (/^\d{4}[\/\-]\d{2}[\/\-]\d{2}$/.test(text)) return text;
+                    if (text.startsWith('https://gyazo.com/')) {
+                        const hash = text.split('/').pop();
+                        return `![image](https://i.gyazo.com/${hash}.jpg)`;
                     }
+                    return `**${text}**`;
                 });
-                // リンク
+
+                line = line.replace(/\*\*(\*\*+ (.+))\]/g, '# $2');
                 line = line.replace(/([^ ]+) (http.+)/g, '[$1]($2)');
-                // 取り消し線
                 line = line.replace(/^- (.+)]/g, '~~$1~~');
-                // 強調 (太字+斜体)
                 line = line.replace(/\*\/ (.+)]/g, '***$1***');
-                // 強調 (太字)
                 line = line.replace(/\* (.+)]/g, '**$1**');
-                // リスト
-                if (line.startsWith(' ')) {
-                    line = '- ' + line.trim();
-                }
+                if (line.startsWith(' ')) line = '- ' + line.trim();
                 return line;
             }).join('\n');
         }
@@ -387,17 +428,15 @@
             const searchHistoryElement = document.getElementById('searchHistory');
             searchHistoryElement.innerHTML = '';
 
-            searchHistory.forEach((keyword, index) => {
+            searchHistory.forEach(keyword => {
                 const item = document.createElement('div');
                 item.className = 'history-item';
                 item.textContent = keyword;
 
-                // マウスホバー時のイベント
                 item.addEventListener('mouseover', () => {
                     document.getElementById('searchInput').value = keyword;
                 });
 
-                // クリック時のイベント
                 item.addEventListener('click', () => {
                     document.getElementById('searchInput').value = keyword;
                     searchAndHighlight(keyword);
@@ -420,15 +459,12 @@
             jsonData.pages.forEach(page => {
                 if (page.title.includes(keyword) || (page.lines && page.lines.some(line => line.includes(keyword)))) {
                     const titleMatch = page.title.match(/^(\d{4}[\/\-]\d{2}[\/\-]\d{2})/);
-                    if (titleMatch) {
-                        matchedDates.add(titleMatch[1]);
-                    }
+                    if (titleMatch) matchedDates.add(titleMatch[1]);
+
                     if (page.lines) {
                         page.lines.forEach(line => {
                             const lineMatch = line.match(/\[(\d{4}[\/\-]\d{2}[\/\-]\d{2})\]/);
-                            if (lineMatch) {
-                                matchedDates.add(lineMatch[1]);
-                            }
+                            if (lineMatch) matchedDates.add(lineMatch[1]);
                         });
                     }
                 }
@@ -447,37 +483,29 @@
             const content = viewer.innerHTML;
             viewer.innerHTML = content.replace(regex, match => `<span class="highlight">${match}</span>`);
 
-            // ハイライト部分までスクロール
             const highlightElement = document.querySelector('.highlight');
-            if (highlightElement) {
-                highlightElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            }
+            if (highlightElement) highlightElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
 
-        // インクリメンタルサーチ（デバウンス処理を追加）
+        // インクリメンタルサーチ
         let debounceTimer;
         document.getElementById('searchInput').addEventListener('input', (e) => {
             const keyword = e.target.value.trim();
             clearTimeout(debounceTimer);
 
             debounceTimer = setTimeout(() => {
-                if (keyword) {
-                    // 検索履歴に追加
-                    if (!searchHistory.includes(keyword)) {
-                        searchHistory.unshift(keyword);
-                        if (searchHistory.length > 10) {
-                            searchHistory.pop();
-                        }
-                        renderSearchHistory();
-                        saveToLocalStorage();
-                    }
+                if (keyword && !searchHistory.includes(keyword)) {
+                    searchHistory.unshift(keyword);
+                    if (searchHistory.length > 10) searchHistory.pop();
+                    renderSearchHistory();
+                    saveAllToDB();
                 }
                 searchAndHighlight(keyword);
-            }, 1000); // 1秒待機
+            }, 1000);
         });
 
-        // ページ読み込み時にLocalStorageからデータを読み込む
-        window.onload = loadFromLocalStorage;
+        // ページ読み込み時にIndexedDBからデータを読み込む
+        window.onload = loadFromDBAll;
     </script>
 </body>
 
