@@ -8,7 +8,7 @@
         body {
             font-family: "Yu Mincho", "Hiragino Mincho Pro", serif;
             margin: 20px;
-            background-color: #FFBE0B1A;
+            background-color: #FF6B6B1A;
             transition: background-color 0.5s;
             display: flex;
             flex-direction: column;
@@ -44,6 +44,7 @@
             transition: background-color 0.3s;
             display: none;
             list-style-type: none;
+            position: relative;
         }
         #fileList li.visible {
             display: block;
@@ -55,6 +56,13 @@
             text-decoration: none;
             color: inherit;
             display: block;
+        }
+        .date {
+            position: absolute;
+            top: 5px;
+            right: 10px;
+            font-size: 0.8em;
+            color: #999;
         }
         .description {
             font-size: 0.9em;
@@ -73,9 +81,9 @@
     <h1>誤字ロマの道具箱</h1>
     <input type="text" id="search" placeholder="検索..." autofocus>
     <ul id="fileList">
-        <li><a href="cosenseDailyPageViewer.html">cosenseDailyPageViewer</a><div class="description">説明文がありません。</div></li>
-        <li><a href="getDailyPagesfromCosenseJSON.html">getDailyPagesfromCosenseJSON</a><div class="description">CosenseのアーカイブJSONからデイリーログを抽出</div></li>
-        <li><a href="label.html">label</a><div class="description">A5縦方向のラベルシートを印刷するためのツール</div></li>
+        <li><div class="date">2026/01/14</div><a href="cosenseDailyPageViewer.html">cosenseDailyPageViewer</a><div class="description">Cosenseのアーカイブからデイリーページっぽいものを集約・表示</div></li>
+        <li><div class="date">2026/01/14</div><a href="getDailyPagesfromCosenseJSON.html">getDailyPagesfromCosenseJSON</a><div class="description">CosenseのアーカイブJSONからデイリーログを抽出</div></li>
+        <li><div class="date">2026/01/14</div><a href="label.html">label</a><div class="description">A5縦方向のラベルシートを印刷するためのツール</div></li>
     </ul>
     <div class="rss-link">
         <a href="rss.xml" target="_blank">RSSフィード</a>
