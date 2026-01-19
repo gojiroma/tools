@@ -18,6 +18,8 @@
             flex-direction: column;
             height: 100vh;
             position: relative;
+            user-select: none;
+            touch-action: none;
         }
 
         #topBar {
@@ -94,6 +96,7 @@
             height: 100px;
             margin: 0;
             cursor: pointer;
+            touch-action: pan-y;
         }
 
         .date-cell:hover,
@@ -135,19 +138,6 @@
         .history-item:hover {
             background-color: #ddd;
         }
-
-        #currentDate {
-            position: fixed;
-            right: 20px;
-            bottom: 120px;
-            background-color: rgba(0, 0, 0, 0.7);
-            color: white;
-            padding: 15px 25px;
-            border-radius: 10px;
-            font-size: 28px;
-            z-index: 15;
-            box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
-        }
     </style>
 </head>
 
@@ -164,7 +154,6 @@
         <div id="searchHistory"></div>
     </div>
     <div id="datepicker"></div>
-    <div id="currentDate"></div>
 
     <script>
         // IndexedDBのセットアップ
@@ -342,7 +331,7 @@
                 const hue = Math.abs(hash) % 360;
                 cell.style.backgroundColor = `hsl(${hue}, 70%, 60%)`;
 
-                cell.addEventListener('mouseover', () => {
+                cell.addEventListener('mouseenter', () => {
                     document.querySelectorAll('.date-cell').forEach(c => c.classList.remove('selected'));
                     cell.classList.add('selected');
                     displayPage(title);
@@ -396,7 +385,6 @@
             });
 
             document.getElementById('viewerContent').innerHTML = cleanHTML;
-            document.getElementById('currentDate').textContent = title;
 
             if (currentKeyword) highlightAndScroll(currentKeyword);
         }
@@ -511,8 +499,106 @@
 
         // ページ読み込み時にIndexedDBからデータを読み込む
         window.onload = loadFromDBAll;
+
+        // タッチ/マウスイベントでスライド中にページを切り替える
+        (function setupSlider() {
+            const datepicker = document.getElementById('datepicker');
+            let isDragging = false;
+            let startX, scrollLeft;
+            let touchStartX, touchScrollLeft;
+            let animationId;
+            let lastSelectedIndex = -1;
+
+            // マウスイベント
+            datepicker.addEventListener('mousedown', (e) => {
+                isDragging = true;
+                startX = e.pageX - datepicker.offsetLeft;
+                scrollLeft = datepicker.scrollLeft;
+                datepicker.style.cursor = 'grabbing';
+                datepicker.style.userSelect = 'none';
+            });
+
+            datepicker.addEventListener('mouseleave', () => {
+                isDragging = false;
+                datepicker.style.cursor = 'grab';
+            });
+
+            datepicker.addEventListener('mouseup', () => {
+                isDragging = false;
+                datepicker.style.cursor = 'grab';
+            });
+
+            datepicker.addEventListener('mousemove', (e) => {
+                if (!isDragging) return;
+                e.preventDefault();
+                const x = e.pageX - datepicker.offsetLeft;
+                const walk = (x - startX) * 2;
+                datepicker.scrollLeft = scrollLeft - walk;
+
+                // スクロール中に選択中のセルを更新
+                updateSelectedCell();
+            });
+
+            // タッチイベント
+            datepicker.addEventListener('touchstart', (e) => {
+                isDragging = true;
+                touchStartX = e.touches[0].pageX - datepicker.offsetLeft;
+                touchScrollLeft = datepicker.scrollLeft;
+                e.preventDefault();
+            });
+
+            datepicker.addEventListener('touchend', () => {
+                isDragging = false;
+            });
+
+            datepicker.addEventListener('touchmove', (e) => {
+                if (!isDragging) return;
+                const x = e.touches[0].pageX - datepicker.offsetLeft;
+                const walk = (x - touchStartX) * 2;
+                datepicker.scrollLeft = touchScrollLeft - walk;
+
+                // スクロール中に選択中のセルを更新
+                updateSelectedCell();
+            });
+
+            // スクロール中に選択中のセルを更新
+            function updateSelectedCell() {
+                cancelAnimationFrame(animationId);
+                animationId = requestAnimationFrame(() => {
+                    const cells = document.querySelectorAll('.date-cell');
+                    const containerRect = datepicker.getBoundingClientRect();
+                    const centerX = containerRect.left + containerRect.width / 2;
+
+                    let closestIndex = -1;
+                    let closestDistance = Infinity;
+
+                    cells.forEach((cell, index) => {
+                        const cellRect = cell.getBoundingClientRect();
+                        const cellCenterX = cellRect.left + cellRect.width / 2;
+                        const distance = Math.abs(cellCenterX - centerX);
+
+                        if (distance < closestDistance) {
+                            closestDistance = distance;
+                            closestIndex = index;
+                        }
+                    });
+
+                    if (closestIndex !== -1 && closestIndex !== lastSelectedIndex) {
+                        lastSelectedIndex = closestIndex;
+                        const title = titles[closestIndex];
+                        if (title) {
+                            document.querySelectorAll('.date-cell').forEach(c => c.classList.remove('selected'));
+                            cells[closestIndex].classList.add('selected');
+                            displayPage(title);
+                        }
+                    }
+                });
+            }
+
+            // スクロールイベントでも更新
+            datepicker.addEventListener('scroll', updateSelectedCell);
+        })();
     </script>
 </body>
 
 </html>
-
