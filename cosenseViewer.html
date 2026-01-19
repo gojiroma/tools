@@ -3,13 +3,12 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="Cosenseのアーカイブをパラパラ見る">
     <title>Cosenseビューア</title>
     <meta name="date" content="2026-01-14">
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.5/purify.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8/hammer.min.js"></script>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -19,7 +18,6 @@
             flex-direction: column;
             height: 100vh;
             position: relative;
-            overflow: hidden;
         }
 
         #topBar {
@@ -40,8 +38,7 @@
 
         #searchInput {
             padding: 5px;
-            width: 100%;
-            max-width: 200px;
+            width: 200px;
         }
 
         #filePicker {
@@ -67,7 +64,7 @@
         #viewer {
             background-color: #f9f9f9;
             padding: 20px;
-            width: 100%;
+            width: calc(100% - 150px);
             height: 100%;
             overflow-y: auto;
             position: relative;
@@ -90,7 +87,6 @@
             white-space: nowrap;
             z-index: 20;
             box-shadow: 0 -2px 5px rgba(0, 0, 0, 0.2);
-            touch-action: pan-y pan-x;
         }
 
         .date-cell {
@@ -98,7 +94,6 @@
             height: 100px;
             margin: 0;
             cursor: pointer;
-            min-width: 120px;
         }
 
         .date-cell:hover,
@@ -129,7 +124,6 @@
             padding: 10px;
             height: 100%;
             overflow-y: auto;
-            display: none; /* スマホでは非表示 */
         }
 
         .history-item {
@@ -153,20 +147,6 @@
             font-size: 28px;
             z-index: 15;
             box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
-        }
-
-        @media (min-width: 768px) {
-            #container {
-                width: calc(100% - 150px);
-            }
-
-            #searchHistory {
-                display: block;
-            }
-
-            #datepicker {
-                overflow-x: hidden;
-            }
         }
     </style>
 </head>
@@ -346,10 +326,13 @@
             const datepicker = document.getElementById('datepicker');
             datepicker.innerHTML = '';
 
+            const cellWidth = (100 / titlesToRender.length) + '%';
+
             titlesToRender.forEach(title => {
                 const cell = document.createElement('div');
                 cell.className = 'date-cell';
                 cell.title = title;
+                cell.style.width = cellWidth;
 
                 // ハッシュ値を使って色を決定
                 let hash = 0;
@@ -374,31 +357,6 @@
 
             const initialTitle = lastSelectedTitle || titlesToRender[0];
             displayPage(initialTitle);
-
-            // Hammer.jsでスワイプ操作を有効化
-            const mc = new Hammer(datepicker);
-            mc.on("swipeleft swiperight", (ev) => {
-                const cells = document.querySelectorAll('.date-cell');
-                let currentIndex = Array.from(cells).findIndex(cell => cell.classList.contains('selected'));
-                if (currentIndex === -1) currentIndex = 0;
-
-                if (ev.type === 'swipeleft' && currentIndex < cells.length - 1) {
-                    currentIndex++;
-                } else if (ev.type === 'swiperight' && currentIndex > 0) {
-                    currentIndex--;
-                }
-
-                cells.forEach((cell, index) => {
-                    if (index === currentIndex) {
-                        cell.classList.add('selected');
-                        displayPage(titlesToRender[currentIndex]);
-                        lastSelectedTitle = titlesToRender[currentIndex];
-                        saveAllToDB();
-                    } else {
-                        cell.classList.remove('selected');
-                    }
-                });
-            });
         }
 
         // 指定されたタイトルに関連するページを取得
@@ -557,3 +515,4 @@
 </body>
 
 </html>
+
