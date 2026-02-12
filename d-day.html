@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link
+      rel="icon"
+      href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📚</text></svg>"
+    />
+    <title>d-day</title>
+    <meta name="description" content="よくある日付カウントダウン">
+    <meta name="date" content="2026-02-13">
+    <style>
+      body {
+        margin: 0;
+        padding: 20px;
+        font-family: Arial, sans-serif;
+        background-color: #f4f7fa;
+      }
+      #card-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+      .card {
+        width: 150px;
+        height: 120px;
+        font-weight: bold;
+        font-size: 14px;
+        border-radius: 10px;
+        box-shadow: 0 1px 5px rgba(0, 0, 0, 0.1);
+        padding: 10px;
+        box-sizing: border-box;
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        overflow: hidden;
+        background-color: #e0f7fa;
+      }
+      .delete-btn {
+        display: none;
+        position: absolute;
+        top: 5px;
+        right: 5px;
+        background-color: red;
+        color: white;
+        border: none;
+        border-radius: 50%;
+        width: 20px;
+        height: 20px;
+        font-size: 12px;
+        cursor: pointer;
+        outline: none;
+      }
+      .card:hover .delete-btn {
+        display: block;
+      }
+      .new-card {
+        background-color: #f0f0f0;
+        color: gray;
+        text-align: center;
+        cursor: pointer;
+        user-select: none;
+      }
+      #modal {
+        display: none;
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        padding: 20px;
+        border-radius: 10px;
+        box-shadow: 0 1px 10px rgba(0, 0, 0, 0.3);
+        width: 80%;
+        max-width: 500px;
+        box-sizing: border-box;
+        background-color: white;
+        z-index: 100;
+      }
+      #modal input {
+        width: 100%;
+        box-sizing: border-box;
+        font-size: 16px;
+        margin-bottom: 10px;
+      }
+      #modal-instructions {
+        font-size: 12px;
+        color: gray;
+        text-align: right;
+        margin-top: 10px;
+      }
+      #import-btn, #export-btn {
+        position: fixed;
+        bottom: 20px;
+        background-color: blue;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        padding: 10px 20px;
+        cursor: pointer;
+        user-select: none;
+      }
+      #import-btn {
+        right: 100px;
+      }
+      #export-btn {
+        right: 20px;
+      }
+      #file-input {
+        display: none;
+      }
+      #modal-overlay {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.5);
+        z-index: 99;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="card-list"></div>
+
+    <div id="modal-overlay"></div>
+    <div id="modal">
+      <input type="text" id="modal-name" placeholder="イベント名" />
+      <input type="date" id="modal-date" />
+    </div>
+
+    <input type="file" id="file-input" accept=".json" />
+    <button id="import-btn">↑</button>
+    <button id="export-btn">↓</button>
+
+    <script>
+      let events = JSON.parse(localStorage.getItem("events")) || [];
+      let currentModalIndex = -1;
+
+      function saveEvents() {
+        localStorage.setItem("events", JSON.stringify(events));
+      }
+
+      function addCard(event, index) {
+        const card = document.createElement("div");
+        card.className = "card";
+
+        const now = new Date();
+        const eventDate = new Date(event.date);
+        const diffTime = Math.max(eventDate - now, 0);
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+        const cardText = document.createElement("div");
+        cardText.innerHTML = `<div style="font-size: 18px;">${event.name}まであと<span style="font-size: 22px;">${diffDays}</span>日</div><small>${event.date}</small>`;
+
+        const deleteBtn = document.createElement("button");
+        deleteBtn.className = "delete-btn";
+        deleteBtn.innerHTML = "&times;";
+        deleteBtn.onclick = (e) => {
+          e.stopPropagation();
+          events.splice(index, 1);
+          saveEvents();
+          renderCards();
+        };
+
+        card.appendChild(cardText);
+        card.appendChild(deleteBtn);
+        card.addEventListener("click", () => openModal(index));
+        document.getElementById("card-list").appendChild(card);
+      }
+
+      function renderCards() {
+        document.getElementById("card-list").innerHTML = "";
+        events.forEach((event, index) => addCard(event, index));
+        addNewCardButton();
+      }
+
+      function addNewCardButton() {
+        const newCard = document.createElement("div");
+        newCard.className = "card new-card";
+        newCard.innerText = "新しいイベントを追加";
+        newCard.onclick = () => {
+          events.push({ name: "新しいイベント", date: new Date().toISOString().split('T')[0] });
+          saveEvents();
+          renderCards();
+          openModal(events.length - 1);
+        };
+        document.getElementById("card-list").appendChild(newCard);
+      }
+
+      function openModal(index) {
+        currentModalIndex = index;
+        const modal = document.getElementById("modal");
+        const overlay = document.getElementById("modal-overlay");
+        const inputName = document.getElementById("modal-name");
+        const inputDate = document.getElementById("modal-date");
+
+        inputName.value = events[index].name;
+        inputDate.value = events[index].date;
+
+        modal.style.display = "block";
+        overlay.style.display = "block";
+
+        setTimeout(() => {
+          inputName.focus();
+        }, 0);
+      }
+
+      function closeModal() {
+        const modal = document.getElementById("modal");
+        const overlay = document.getElementById("modal-overlay");
+        modal.style.display = "none";
+        overlay.style.display = "none";
+      }
+
+      document.getElementById("modal-overlay").addEventListener("click", () => {
+        closeModal();
+      });
+
+      document.getElementById("modal-name").addEventListener("input", () => {
+        if (currentModalIndex >= 0) {
+          events[currentModalIndex].name = document.getElementById("modal-name").value;
+          saveEvents();
+          renderCards();
+        }
+      });
+
+      document.getElementById("modal-date").addEventListener("change", () => {
+        if (currentModalIndex >= 0) {
+          events[currentModalIndex].date = document.getElementById("modal-date").value;
+          saveEvents();
+          renderCards();
+        }
+      });
+
+      document.getElementById("export-btn").onclick = () => {
+        const blob = new Blob([JSON.stringify(events)], {
+          type: "application/json",
+        });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "events.json";
+        a.click();
+      };
+
+      document.getElementById("import-btn").onclick = () => {
+        document.getElementById("file-input").click();
+      };
+
+      document.getElementById("file-input").addEventListener("change", (event) => {
+        const file = event.target.files[0];
+        if (file) {
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            events = JSON.parse(e.target.result);
+            saveEvents();
+            renderCards();
+          };
+          reader.readAsText(file);
+        }
+      });
+
+      renderCards();
+    </script>
+  </body>
+</html>
