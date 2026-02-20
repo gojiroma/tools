@@ -14,7 +14,7 @@
         <description>生活を楽しくする小物たちを公開</description>
         
         
-        <lastBuildDate>Thu, 12 Feb 2026 18:12:52 +0900</lastBuildDate>
+        <lastBuildDate>Fri, 20 Feb 2026 08:46:18 +0900</lastBuildDate>
         
         
         
@@ -31,6 +31,26 @@
             
             
             <description>JSONから複数条件でページを抽出</description>
+            
+        
+        </item>
+        
+
+
+        
+        <item>
+            
+            
+            <title>barcodeUnload</title>
+            
+            
+            <link>barcodeUnload.html</link>
+            
+            
+            <pubDate>Fri, 20 Feb 2026 00:00:00 +0900</pubDate>
+            
+            
+            <description>バーコードリーダーに蓄積したJANコードを一括検索</description>
             
         
         </item>
