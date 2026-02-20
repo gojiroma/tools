@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>👀</text></svg">
+    <title>d-day</title>
+    <meta name="description" content="バーコードリーダーに蓄積したJANコードを一括検索">
+    <meta name="date" content="2026-02-20">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f5f5f5;
+        }
+        #searchArea {
+            width: 80%;
+            height: 300px;
+            padding: 10px;
+            font-size: 16px;
+            resize: none;
+        }
+    </style>
+</head>
+<body>
+    <textarea id="searchArea" placeholder="各行にJANコードまたはURLを入力してください..."></textarea>
+
+    <script>
+        const searchArea = document.getElementById('searchArea');
+        let timer;
+
+        // 入力が止まったら実行
+        searchArea.addEventListener('input', () => {
+            clearTimeout(timer);
+            timer = setTimeout(() => {
+                processLines();
+            }, 1000); // 1秒待機
+        });
+
+        function processLines() {
+            const lines = searchArea.value.split('\n').filter(line => line.trim() !== '');
+            lines.forEach(line => {
+                if (line.trim().startsWith('http')) {
+                    // URLの場合は直接開く
+                    window.open(line.trim(), '_blank');
+                } else {
+                    // JANコードやキーワードの場合は「I'm Feeling Lucky」検索
+                    const url = `https://www.google.com/search?q=${encodeURIComponent(line.trim())}&btnI=I'm+Feeling+Lucky`;
+                    window.open(url, '_blank');
+                }
+            });
+        }
+    </script>
+</body>
+</html>
